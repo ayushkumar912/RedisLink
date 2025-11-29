@@ -1,15 +1,9 @@
-/**
- * API Routes for RedisLink
- * Enhanced with validation middleware
- */
-
 const express = require('express');
 const router = express.Router();
 
 const { createUrl, getUrl } = require('../controllers/urlController');
 const { validateUrlCreation, validateUrlCode } = require('../validators/urlValidator');
 
-// Welcome route
 router.get('/', (req, res) => {
   res.status(200).json({
     status: true,
@@ -23,19 +17,15 @@ router.get('/', (req, res) => {
   });
 });
 
-// Favicon handler
 router.get('/favicon.ico', (req, res) => {
   res.status(204).end();
 });
 
-// URL shortening endpoint with validation
 router.post('/url/shorten', validateUrlCreation, createUrl);
 
-// URL redirection endpoint with validation (exclude system routes)
 router.get('/:urlCode', (req, res, next) => {
   const { urlCode } = req.params;
   
-  // Skip validation for system routes
   const systemRoutes = ['favicon.ico', 'health', 'robots.txt', 'sitemap.xml'];
   if (systemRoutes.includes(urlCode)) {
     return next('route');

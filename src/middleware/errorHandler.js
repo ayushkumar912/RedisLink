@@ -1,11 +1,5 @@
-/**
- * Error Handling Middleware
- * Centralized error handling for the RedisLink application
- */
-
 const config = require('../config');
 
-// Custom Error Classes
 class AppError extends Error {
   constructor(message, statusCode, isOperational = true) {
     super(message);
@@ -38,33 +32,27 @@ class DatabaseError extends AppError {
   }
 }
 
-// Error handling middleware
 const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
 
-  // Log error
   console.error('Error:', err);
 
-  // Mongoose bad ObjectId
   if (err.name === 'CastError') {
     const message = 'Invalid URL code format';
     error = new ValidationError(message);
   }
 
-  // Mongoose duplicate key
   if (err.code === 11000) {
     const message = 'URL already exists';
     error = new ValidationError(message);
   }
 
-  // Mongoose validation error
   if (err.name === 'ValidationError' && err.errors) {
     const message = Object.values(err.errors).map(val => val.message).join(', ');
     error = new ValidationError(message);
   }
 
-  // JWT errors
   if (err.name === 'JsonWebTokenError') {
     const message = 'Invalid token';
     error = new ValidationError(message);
@@ -75,7 +63,6 @@ const errorHandler = (err, req, res, next) => {
     error = new ValidationError(message);
   }
 
-  // Send error response
   res.status(error.statusCode || 500).json({
     status: false,
     message: error.message || 'Internal server error',
@@ -86,12 +73,10 @@ const errorHandler = (err, req, res, next) => {
   });
 };
 
-// Async error wrapper
 const asyncHandler = (fn) => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };
 
-// 404 handler
 const notFound = (req, res, next) => {
   const error = new NotFoundError(`Route ${req.originalUrl} not found`);
   next(error);

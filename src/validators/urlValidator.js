@@ -1,31 +1,22 @@
-/**
- * Validation Schemas and Middleware
- * Input validation for RedisLink API endpoints
- */
-
 const { ValidationError } = require('../middleware/errorHandler');
 const validUrl = require('valid-url');
 const config = require('../config');
 
-// URL validation schema
 const urlValidationRules = {
   longUrl: {
     required: true,
     type: 'string',
     maxLength: config.url.maxLength,
     validate: (value) => {
-      // Check if it's a valid web URI
       if (!validUrl.isWebUri(value)) {
         throw new ValidationError('Please provide a valid URL with http:// or https://');
       }
 
-      // Check protocol
       const url = new URL(value);
       if (!config.url.protocols.includes(url.protocol)) {
         throw new ValidationError('URL must use HTTP or HTTPS protocol');
       }
 
-      // Check for malicious patterns
       const maliciousPatterns = [
         /javascript:/i,
         /data:/i,
@@ -43,7 +34,6 @@ const urlValidationRules = {
   }
 };
 
-// URL code validation schema
 const urlCodeValidationRules = {
   urlCode: {
     required: true,
@@ -60,31 +50,26 @@ const urlCodeValidationRules = {
   }
 };
 
-// Generic validator function
 const validate = (data, rules) => {
   const errors = [];
 
   for (const [field, rule] of Object.entries(rules)) {
     const value = data[field];
 
-    // Required field check
     if (rule.required && (value === undefined || value === null || value === '')) {
       errors.push(`${field} is required`);
       continue;
     }
 
-    // Skip further validation if field is not required and not provided
     if (!rule.required && (value === undefined || value === null || value === '')) {
       continue;
     }
 
-    // Type validation
     if (rule.type && typeof value !== rule.type) {
       errors.push(`${field} must be of type ${rule.type}`);
       continue;
     }
 
-    // String validations
     if (rule.type === 'string') {
       if (rule.minLength && value.length < rule.minLength) {
         errors.push(`${field} must be at least ${rule.minLength} characters long`);
@@ -99,7 +84,6 @@ const validate = (data, rules) => {
       }
     }
 
-    // Custom validation
     if (rule.validate) {
       try {
         rule.validate(value);
@@ -116,7 +100,6 @@ const validate = (data, rules) => {
   return true;
 };
 
-// Middleware factories
 const validateUrlCreation = (req, res, next) => {
   try {
     validate(req.body, urlValidationRules);
@@ -135,16 +118,12 @@ const validateUrlCode = (req, res, next) => {
   }
 };
 
-// Request sanitization
 const sanitizeInput = (req, res, next) => {
-  // Sanitize request body
   if (req.body) {
     for (const [key, value] of Object.entries(req.body)) {
       if (typeof value === 'string') {
-        // Trim whitespace
         req.body[key] = value.trim();
         
-        // Basic XSS prevention
         req.body[key] = req.body[key]
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
@@ -154,7 +133,6 @@ const sanitizeInput = (req, res, next) => {
     }
   }
 
-  // Sanitize URL parameters
   if (req.params) {
     for (const [key, value] of Object.entries(req.params)) {
       if (typeof value === 'string') {

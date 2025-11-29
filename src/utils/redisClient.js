@@ -1,8 +1,3 @@
-/**
- * Redis Cache Manager
- * Robust Redis client with connection pooling, error handling, and fallback strategies
- */
-
 const redis = require('redis');
 const { promisify } = require('util');
 const config = require('../config');
@@ -36,7 +31,6 @@ class RedisManager {
         max_attempts: this.maxRetries
       });
 
-      // Event handlers
       this.client.on('connect', () => {
         console.log('Redis connected successfully');
         this.isConnected = true;
@@ -159,15 +153,12 @@ class RedisManager {
   }
 }
 
-// Create singleton instance
 const redisManager = new RedisManager();
 
-// Initialize connection
 redisManager.connect().catch(err => {
   console.error('Failed to initialize Redis:', err.message);
 });
 
-// Graceful shutdown
 process.on('SIGINT', async () => {
   await redisManager.disconnect();
 });

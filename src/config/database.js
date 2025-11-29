@@ -1,8 +1,3 @@
-/**
- * Database Connection Manager
- * Handles MongoDB connection with proper error handling and reconnection logic
- */
-
 const mongoose = require('mongoose');
 const config = require('./index');
 
@@ -25,7 +20,6 @@ class DatabaseManager {
     try {
       mongoose.set('strictQuery', true);
       
-      // Connection events
       mongoose.connection.on('connected', () => {
         console.log('MongoDB connected successfully');
         this.isConnected = true;
@@ -41,7 +35,6 @@ class DatabaseManager {
         this.isConnected = false;
       });
 
-      // Graceful shutdown
       process.on('SIGINT', async () => {
         await this.disconnect();
         process.exit(0);
