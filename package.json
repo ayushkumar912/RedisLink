@@ -1,6 +1,6 @@
 {
   "name": "redislink",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "High-Performance URL Shortening Service with Redis Caching",
   "main": "index.js",
   "scripts": {
@@ -26,9 +26,9 @@
     "helmet": "^8.1.0",
     "mongoose": "^7.2.2",
     "morgan": "^1.10.0",
+    "nanoid": "^3.3.6",
     "nodemon": "^2.0.22",
-    "redis": "^3.1.2",
-    "shortid": "^2.2.16",
+    "redis": "^4.6.7",
     "valid-url": "^1.0.9",
     "validator": "^13.9.0"
   }

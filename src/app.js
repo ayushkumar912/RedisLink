@@ -7,6 +7,7 @@ const config = require('./config');
 const routes = require('./routes/route.js');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 const { sanitizeInput } = require('./validators/urlValidator');
+const { generalLimiter } = require('./middleware/rateLimiter');
 const databaseManager = require('./config/database');
 const redisManager = require('./utils/redisClient');
 
@@ -26,6 +27,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use(sanitizeInput);
+app.use(generalLimiter);
 
 if (config.server.env === 'development') {
   app.use(morgan('dev'));

@@ -25,6 +25,14 @@ const urlSchema = new mongoose.Schema({
         required: [true, 'Please provide a shortUrl'],
         unique: true,
         trim: true,
+    },
+    clicks: {
+        type: Number,
+        default: 0
+    },
+    expiresAt: {
+        type: Date,
+        default: null
     }
 }, { timestamps: true });
 

@@ -31,6 +31,32 @@ const urlValidationRules = {
 
       return true;
     }
+  },
+  customCode: {
+    required: false,
+    type: 'string',
+    minLength: 3,
+    maxLength: 20,
+    validate: (value) => {
+      if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+        throw new ValidationError('customCode must contain only letters, numbers, hyphens, and underscores');
+      }
+      return true;
+    }
+  },
+  expiresAt: {
+    required: false,
+    type: 'string',
+    validate: (value) => {
+      const date = new Date(value);
+      if (isNaN(date.getTime())) {
+        throw new ValidationError('expiresAt must be a valid ISO date string');
+      }
+      if (date <= new Date()) {
+        throw new ValidationError('expiresAt must be a future date');
+      }
+      return true;
+    }
   }
 };
 
@@ -118,6 +144,33 @@ const validateUrlCode = (req, res, next) => {
   }
 };
 
+const validateBulkCreation = (req, res, next) => {
+  try {
+    const { urls } = req.body;
+    if (!Array.isArray(urls)) {
+      throw new ValidationError('urls must be an array');
+    }
+    if (urls.length === 0) {
+      throw new ValidationError('urls array cannot be empty');
+    }
+    if (urls.length > 10) {
+      throw new ValidationError('Maximum 10 URLs per bulk request');
+    }
+    urls.forEach((item, index) => {
+      if (!item || !item.longUrl) {
+        throw new ValidationError(`urls[${index}].longUrl is required`);
+      }
+      validate(
+        { longUrl: item.longUrl, customCode: item.customCode, expiresAt: item.expiresAt },
+        urlValidationRules
+      );
+    });
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
 const sanitizeInput = (req, res, next) => {
   if (req.body) {
     for (const [key, value] of Object.entries(req.body)) {
@@ -147,6 +200,7 @@ const sanitizeInput = (req, res, next) => {
 module.exports = {
   validateUrlCreation,
   validateUrlCode,
+  validateBulkCreation,
   sanitizeInput,
   validate,
   urlValidationRules,

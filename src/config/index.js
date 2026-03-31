@@ -40,8 +40,14 @@ const config = {
   },
 
   rateLimiting: {
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100 // limit each IP to 100 requests per windowMs
+    general: {
+      windowMs: 15 * 60 * 1000,
+      max: 100
+    },
+    shorten: {
+      windowMs: 15 * 60 * 1000,
+      max: 20
+    }
   }
 };
 
@@ -51,6 +57,7 @@ const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 if (missingEnvVars.length > 0) {
   console.error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
   console.error('Please check your .env file');
+  process.exit(1);
 }
 
 module.exports = config;
