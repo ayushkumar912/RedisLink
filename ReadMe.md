@@ -6,11 +6,74 @@
 [![MongoDB](https://img.shields.io/badge/mongodb-v7.0+-blue.svg)](https://www.mongodb.com/)
 [![Redis](https://img.shields.io/badge/redis-v7.0+-red.svg)](https://redis.io/)
 
-## Live Demo
+## Architecture
 
-- **API Base URL**: `http://localhost:3000`
-- **Health Check**: `http://localhost:3000/health`
-- **Shorten a URL**: `POST /api/v1/url/shorten`
+```
++------------------------------------------------------------------------------------------------------------------+
+|                                         RedisLink - URL Shortener                                                |
++------------------------------------------------------------------------------------------------------------------+
+
+                                          +------------------+
+                                          |     [Client]     |
+                                          +--------+---------+
+                                                   |
+                                                   v
++--------------------------------------------------+-------------------------------------------------+
+|                                    [Express Middleware Layer]                                       |
+|   [CORS] --> [Helmet] --> [Morgan Logger] --> [Input Sanitizer] --> [Rate Limiter (Redis-backed)]   |
++--------------------------------------------------+-------------------------------------------------+
+                                                   |
+                        +-------------------------++--------------------------+
+                        |                          |                          |
+                        v                          v                          v
+             +----------+----------+   +----------+---------+   +------------+--------+
+             |  POST /api/v1/url/  |   | GET /:urlCode      |   | GET /api/v1/url/    |
+             |  shorten | /bulk    |   | (Redirect)         |   | :urlCode/stats      |
+             +----------+----------+   +----------+---------+   +------------+--------+
+                        |                          |                          |
+                        v                          v                          v
+             +----------+----------+   +----------+---------+   +------------+--------+
+             | [Validator Layer]   |   | [Validator Layer]  |   | [Validator Layer]   |
+             | Schema + Sanitize   |   | Code format check  |   | Code format check   |
+             | + Axios URL check   |   +----------+---------+   +------------+--------+
+             +----+----+-----------+              |                          |
+                  |    |                          v                          v
+                  |  [Axios] --> [External URL]  ++---------------------------+
+                  |              Reachability    |    [Controller Layer]      |
+                  v              Check           |  (Thin HTTP Handlers)      |
+          +-------+---------+                   ++-----------+--------------++
+          | [Controller]    |                    |           |               |
+          | createUrl       |                    v           v               v
+          | bulkCreate      |            +-------+----+ +----+------+ +------+------+
+          +-------+---------+            | getLongUrl | | getStats  | |             |
+                  |                      +-------+----+ +----+------+ |             |
+                  v                              |           |         |             |
+          +-------+-------------------------+    |           |         |             |
+          |         [Service Layer]         |<---+-----------+---------+             |
+          |  createShortUrl / bulkCreate    |                                        |
+          |  getLongUrl / getUrlStats       |                                        |
+          +--+--+--+-----+----------------++                                        |
+             |  |  |     |                                                           |
+             |  |  |     +-------> [MongoDB Model] -----> [MongoDB]                 |
+             |  |  |                  findOne / create      redislinks collection    |
+             |  |  |                  updateOne ($inc)       urlCode, shortUrl,      |
+             |  |  |                                         longUrl, clicks,        |
+             |  |  |                                         expiresAt               |
+             |  |  |                                                                 |
+             |  |  +-----------> [Redis Client] -----> [Redis Cache]                |
+             |  |                  GET urlCode            L1: urlCode -> longUrl     |
+             |  |                  SET urlCode            L1: longUrl -> urlCode     |
+             |  |                  DEL (expired)          Rate limit keys            |
+             |  |                                         TTL: 24hr                 |
+             |  |                                                                    |
+             |  +---------------> [Fire-and-Forget]                                 |
+             |                    incrementClicks()                                  |
+             |                    (async, no await)                                  |
+             |                                                                       |
+             +-----> [Error Handler] --> [AppError / ValidationError / NotFoundError / DatabaseError]
+                     Centralized
+                     Middleware
+```
 
 
 ### **Enterprise Architecture**
