@@ -1,5 +1,9 @@
 const { createClient } = require('redis');
+const { promisify } = require('util');
 const config = require('../config');
+const redisPackage = require('redis/package.json');
+
+const isRedisV3 = redisPackage.version.startsWith('3.');
 
 class RedisManager {
   constructor() {
@@ -20,21 +24,35 @@ class RedisManager {
 
   async _connect() {
     try {
-      const clientOptions = {
-        socket: {
-          host: config.redis.host,
-          port: config.redis.port,
-          reconnectStrategy: (retries) => {
-            if (retries >= this.maxRetries) {
-              console.log('Application will continue without Redis caching');
-              return false;
+      const clientOptions = isRedisV3
+        ? {
+            host: config.redis.host,
+            port: config.redis.port,
+            retry_strategy: (options) => {
+              if (options.attempt >= this.maxRetries) {
+                console.log('Application will continue without Redis caching');
+                return undefined;
+              }
+              this.retryCount = options.attempt;
+              console.log(`Retrying Redis connection (${options.attempt}/${this.maxRetries})`);
+              return Math.min(options.attempt * 100, 3000);
             }
-            this.retryCount = retries;
-            console.log(`Retrying Redis connection (${retries}/${this.maxRetries})`);
-            return Math.min(retries * 100, 3000);
           }
-        }
-      };
+        : {
+            socket: {
+              host: config.redis.host,
+              port: config.redis.port,
+              reconnectStrategy: (retries) => {
+                if (retries >= this.maxRetries) {
+                  console.log('Application will continue without Redis caching');
+                  return false;
+                }
+                this.retryCount = retries;
+                console.log(`Retrying Redis connection (${retries}/${this.maxRetries})`);
+                return Math.min(retries * 100, 3000);
+              }
+            }
+          };
 
       if (config.redis.password) {
         clientOptions.password = config.redis.password;
@@ -62,7 +80,21 @@ class RedisManager {
         console.log('Reconnecting to Redis...');
       });
 
-      await this.client.connect();
+      if (this.client.connect) {
+        await this.client.connect();
+      } else {
+        this.promisifiedClient = {
+          set: promisify(this.client.set).bind(this.client),
+          get: promisify(this.client.get).bind(this.client),
+          del: promisify(this.client.del).bind(this.client),
+          exists: promisify(this.client.exists).bind(this.client),
+          incr: promisify(this.client.incr).bind(this.client),
+          expire: promisify(this.client.expire).bind(this.client),
+          quit: promisify(this.client.quit).bind(this.client)
+        };
+        this.isConnected = true;
+      }
+
       return this.client;
     } catch (error) {
       console.error('Failed to initialize Redis client:', error.message);
@@ -74,6 +106,9 @@ class RedisManager {
   async set(key, value, ttl = config.redis.ttl) {
     try {
       if (!this.isConnected || !this.client) return null;
+      if (isRedisV3) {
+        return await this.promisifiedClient.set(key, JSON.stringify(value), 'EX', ttl);
+      }
       return await this.client.set(key, JSON.stringify(value), { EX: ttl });
     } catch (error) {
       console.error('Redis SET error:', error.message);
@@ -84,7 +119,9 @@ class RedisManager {
   async get(key) {
     try {
       if (!this.isConnected || !this.client) return null;
-      const result = await this.client.get(key);
+      const result = isRedisV3
+        ? await this.promisifiedClient.get(key)
+        : await this.client.get(key);
       return result ? JSON.parse(result) : null;
     } catch (error) {
       console.error('Redis GET error:', error.message);
@@ -95,7 +132,9 @@ class RedisManager {
   async del(key) {
     try {
       if (!this.isConnected || !this.client) return null;
-      return await this.client.del(key);
+      return isRedisV3
+        ? await this.promisifiedClient.del(key)
+        : await this.client.del(key);
     } catch (error) {
       console.error('Redis DELETE error:', error.message);
       return null;
@@ -105,7 +144,9 @@ class RedisManager {
   async exists(key) {
     try {
       if (!this.isConnected || !this.client) return false;
-      return await this.client.exists(key);
+      return isRedisV3
+        ? await this.promisifiedClient.exists(key)
+        : await this.client.exists(key);
     } catch (error) {
       console.error('Redis EXISTS error:', error.message);
       return false;
@@ -115,7 +156,9 @@ class RedisManager {
   async incr(key) {
     try {
       if (!this.isConnected || !this.client) return null;
-      return await this.client.incr(key);
+      return isRedisV3
+        ? await this.promisifiedClient.incr(key)
+        : await this.client.incr(key);
     } catch (error) {
       console.error('Redis INCR error:', error.message);
       return null;
@@ -125,7 +168,9 @@ class RedisManager {
   async expire(key, seconds) {
     try {
       if (!this.isConnected || !this.client) return null;
-      return await this.client.expire(key, seconds);
+      return isRedisV3
+        ? await this.promisifiedClient.expire(key, seconds)
+        : await this.client.expire(key, seconds);
     } catch (error) {
       console.error('Redis EXPIRE error:', error.message);
       return null;
@@ -135,7 +180,11 @@ class RedisManager {
   async disconnect() {
     try {
       if (this.client && this.isConnected) {
-        await this.client.quit();
+        if (isRedisV3) {
+          await this.promisifiedClient.quit();
+        } else {
+          await this.client.quit();
+        }
         console.log('Redis connection closed gracefully');
       }
     } catch (error) {

@@ -72,6 +72,7 @@ Request → Router → Validator → Controller → Service → Model/Cache
 **Reasoning:**
 - **Thin controllers** delegate all business logic to service classes. This keeps controllers focused on HTTP concerns (parsing request, sending response) and makes services independently testable without an HTTP layer.
 - **Validators** are extracted into their own layer so validation logic is reusable and not buried inside controllers or services.
+- **Factory + Strategy for URL creation** keeps generated-code and custom-code creation rules isolated while preserving one public `createShortUrl` service entry point.
 - **Middleware** handles cross-cutting concerns (rate limiting, error handling, logging) without polluting business logic.
 - This separation of concerns makes the codebase easier to reason about for reviewers and easier to extend without cascading changes.
 

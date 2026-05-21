@@ -117,6 +117,8 @@ src/
 │   └── database.js          #   Database connection manager
 ├── controllers/              # Thin controllers — delegate to service layer
 │   └── urlController.js     #   createUrl, getUrl, getStats, bulkCreate
+├── factories/                # Runtime selection of business strategies
+│   └── urlCreationStrategyFactory.js
 ├── middleware/               # Custom middleware
 │   ├── errorHandler.js      #   Error handling & custom error classes
 │   └── rateLimiter.js       #   Redis-based per-IP rate limiting
@@ -126,7 +128,11 @@ src/
 │   ├── route.js             #   Root routes + mounts /api/v1
 │   └── v1.js                #   Versioned API routes
 ├── services/                 # Business logic layer
-│   └── urlService.js        #   createShortUrl, getLongUrl, stats, bulk
+│   └── urlService.js        #   URL orchestration, redirects, stats, bulk
+├── strategies/               # URL creation strategies
+│   ├── BaseUrlCreationStrategy.js
+│   ├── CustomCodeStrategy.js
+│   └── GeneratedCodeStrategy.js
 ├── validators/               # Input validation & sanitization
 │   └── urlValidator.js      #   URL + customCode + expiresAt + bulk validation
 └── utils/                    # Utility modules
@@ -468,5 +474,4 @@ LOG_LEVEL=info
 - [ ] **Redis Password Auth**: Secure Redis in production deployments
 
 ---
-
 

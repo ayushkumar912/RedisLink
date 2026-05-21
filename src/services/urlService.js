@@ -1,11 +1,8 @@
-const { customAlphabet } = require('nanoid');
 const URLModel = require('../models/urlModel');
 const redisManager = require('../utils/redisClient');
 const { checkValidUrl } = require('../utils/axiosValidation');
 const { ValidationError, NotFoundError } = require('../middleware/errorHandler');
-const config = require('../config');
-
-const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', 9);
+const { getUrlCreationStrategy } = require('../factories/urlCreationStrategyFactory');
 
 const createShortUrl = async (longUrl, customCode = null, expiresAt = null) => {
   const isValidUrl = await checkValidUrl(longUrl);
@@ -13,51 +10,8 @@ const createShortUrl = async (longUrl, customCode = null, expiresAt = null) => {
     throw new ValidationError('URL is not accessible or invalid');
   }
 
-  // If a custom code is requested, skip the cache/existing-URL check — always create a new entry
-  if (!customCode) {
-    const cachedUrl = await redisManager.get(longUrl);
-    if (cachedUrl) {
-      return { data: cachedUrl, created: false };
-    }
-
-    const existingUrl = await URLModel.findOne({ longUrl });
-    if (existingUrl) {
-      const urlData = {
-        urlCode: existingUrl.urlCode,
-        shortUrl: existingUrl.shortUrl,
-        longUrl: existingUrl.longUrl
-      };
-      await redisManager.set(longUrl, urlData);
-      return { data: urlData, created: false };
-    }
-  } else {
-    const taken = await URLModel.findOne({ urlCode: customCode.toLowerCase() });
-    if (taken) {
-      throw new ValidationError(`Custom code "${customCode}" is already taken`);
-    }
-  }
-
-  const urlCode = customCode ? customCode.toLowerCase() : nanoid();
-  const shortUrl = `${config.server.baseUrl}/${urlCode}`;
-
-  const url = await URLModel.create({
-    urlCode,
-    longUrl,
-    shortUrl,
-    expiresAt: expiresAt ? new Date(expiresAt) : null
-  });
-
-  const urlData = {
-    urlCode: url.urlCode,
-    shortUrl: url.shortUrl,
-    longUrl: url.longUrl,
-    ...(url.expiresAt && { expiresAt: url.expiresAt })
-  };
-
-  await redisManager.set(longUrl, urlData);
-  await redisManager.set(urlCode, { longUrl: url.longUrl, expiresAt: url.expiresAt });
-
-  return { data: urlData, created: true };
+  const strategy = getUrlCreationStrategy({ customCode });
+  return strategy.create({ longUrl, customCode, expiresAt });
 };
 
 const getLongUrl = async (urlCode) => {
